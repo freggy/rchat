@@ -1,0 +1,8 @@
+[package]
+name = "rchat"
+version = "0.1.0"
+authors = ["Yannic Rieger <riegeryannic@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bytebuffer = "0.2.1"
