@@ -23,8 +23,29 @@ fn main() -> std::io::Result<()> {
 
             let length = buf.read_var_int();
             let id = buf.read_var_int();
+
             println!("{}", length);
             println!("{}", id);
+
+            buf.resize(length as usize);
+
+            match id {
+                0x01 => {
+                    println!("Encryption Request");
+                    let server_id = buf.read_string_utf8().unwrap();
+                    let key_len = buf.read_var_int();
+                    let key = buf.read_bytes(key_len as usize);
+                    let token_length = buf.read_var_int();
+                    let token = buf.read_bytes(token_length as usize);
+                    // TOOD: encryption response
+                }
+                0x02 => {
+                    println!("Login Success");
+                    let uuid = buf.read_string_utf8().unwrap();
+                    let name = buf.read_string_utf8();
+                }
+                _ => println!("Bad packet id")
+            }
         }
     });
 
