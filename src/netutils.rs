@@ -68,3 +68,12 @@ impl VarInt for ByteBuffer {
         }
     }
 }
+
+pub fn get_var_int_length(val: i32) -> i32 {
+    for i in 1..5 {
+        if (val & -1 << i * 7) == 0 {
+            return i;
+        }
+    }
+    5
+}
