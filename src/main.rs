@@ -22,9 +22,10 @@ fn main() -> std::io::Result<()> {
     let mut buf = ByteBuffer::new();
 
     let t = thread::spawn(move || {
-        let mut arr = [0u8; 1024];
+        let mut arr = vec![0; 5]; // allocate 5 bytes since varint are at max 5 bytes long
         loop {
             reader.read(&mut arr);
+
             let mut buf = ByteBuffer::from_bytes(&arr);
 
             let length = buf.read_var_int();
@@ -33,7 +34,17 @@ fn main() -> std::io::Result<()> {
             println!("{}", length);
             println!("{}", id);
 
-            buf.resize(length as usize);
+            let id_len = netutils::get_var_int_length(id);
+
+            // length of packet = data length + length of id varint
+            // that is why we subtract id_len from the over all length.
+            // This way we get the length of the relevant packet data.
+            let data_len = length - id_len;
+
+            // grow vec to hold new data
+            arr.resize(data_len as usize, 0);
+            reader.read(&mut arr);
+            buf.write_bytes(&mut arr);
 
             match id {
                 0x01 => {
@@ -43,6 +54,11 @@ fn main() -> std::io::Result<()> {
                     let key = buf.read_bytes(key_len as usize);
                     let token_length = buf.read_var_int();
                     let token = buf.read_bytes(token_length as usize);
+
+                    println!("server id: {}", server_id);
+                    println!("key: {:x?}", key);
+                    println!("token: {:x?}", token);
+
                     // TOOD: encryption response
                 }
                 0x02 => {
@@ -60,6 +76,10 @@ fn main() -> std::io::Result<()> {
 
     create_login_start_data(&mut buf, "freggyy");
     send_packet(0x00, &mut buf, &mut writer);
+
+
+
+
 
     t.join();
     Ok(())
