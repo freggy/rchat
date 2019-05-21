@@ -3,14 +3,12 @@ use std::string::{String, FromUtf8Error};
 use std::io::Read;
 use std::fmt::Error;
 
-
 pub trait Strings {
     fn read_string_utf8(&mut self) -> Result<String, FromUtf8Error>;
     fn write_string_utf8(&mut self, string: &str);
 }
 
 impl Strings for ByteBuffer {
-
     fn read_string_utf8(&mut self) -> Result<String, FromUtf8Error> {
         let len = self.read_var_int();
         String::from_utf8(self.read_bytes(len as usize))
@@ -21,7 +19,6 @@ impl Strings for ByteBuffer {
         self.write_bytes(string.as_bytes())
     }
 }
-
 
 
 pub trait VarInt {

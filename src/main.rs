@@ -48,7 +48,7 @@ fn main() -> std::io::Result<()> {
 
             match id {
                 0x01 => {
-                    println!("Encryption Request");
+                    println!("Received encryption request");
                     let server_id = buf.read_string_utf8().unwrap();
                     let key_len = buf.read_var_int();
                     let key = buf.read_bytes(key_len as usize);
@@ -59,10 +59,12 @@ fn main() -> std::io::Result<()> {
                     println!("key: {:x?}", key);
                     println!("token: {:x?}", token);
 
+
+                    println!("Sending encryption response")
                     // TOOD: encryption response
                 }
                 0x02 => {
-                    println!("Login Success");
+                    println!("Login successful!");
                     let uuid = buf.read_string_utf8().unwrap();
                     let name = buf.read_string_utf8();
                 }
@@ -76,9 +78,6 @@ fn main() -> std::io::Result<()> {
 
     create_login_start_data(&mut buf, "freggyy");
     send_packet(0x00, &mut buf, &mut writer);
-
-
-
 
 
     t.join();
