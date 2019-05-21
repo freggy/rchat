@@ -1,5 +1,7 @@
 extern crate bytebuffer;
 extern crate byteorder;
+extern crate crypto;
+extern crate num_bigint;
 
 pub mod netutils;
 
@@ -9,6 +11,10 @@ use bytebuffer::ByteBuffer;
 use std::net::TcpStream;
 use std::io::{Write, Read};
 use std::thread;
+use std::fmt::Write as AWrite;
+use self::crypto::digest::Digest;
+use self::crypto::sha1::Sha1;
+use num_bigint::BigInt;
 
 fn main() -> std::io::Result<()> {
     let mut reader = TcpStream::connect("127.0.0.1:25565")?;
@@ -78,4 +84,41 @@ fn create_handshake_data(buf: &mut ByteBuffer, protocol_version: i32, ip: &str, 
 fn create_login_start_data(buf: &mut ByteBuffer, name: &str) {
     buf.clear();
     buf.write_string_utf8(name)
+}
+
+fn create_mc_sha1(name: &str) -> String {
+    let mut hasher = Sha1::new();
+    let mut data = [0u8; 20];
+
+    hasher.input_str(name);
+    hasher.result(&mut data);
+
+    let mut negative = (data[0] & 0x80) == 0x80;
+
+    if negative {
+        twos_complement(&mut data);
+    }
+
+    let mut hex = String::new();
+
+    for i in data.iter() {
+        write!(&mut hex, "{:x}", i).expect("Could not write to string");
+    }
+
+    if negative {
+        hex.insert_str(0, "-")
+    }
+
+    hex
+}
+
+fn twos_complement(p: &mut [u8]) {
+    let mut carry = true;
+    for i in p.iter_mut().rev() {
+        *i = !*i;
+        if carry {
+            carry = *i == 0xFFu8;
+            *i += 1
+        }
+    }
 }
