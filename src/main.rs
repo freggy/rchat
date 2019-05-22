@@ -1,9 +1,12 @@
 extern crate bytebuffer;
 extern crate byteorder;
 extern crate crypto;
-extern crate num_bigint;
+
+#[macro_use]
+extern crate serde_json;
 
 pub mod netutils;
+pub mod mojang;
 
 use netutils::VarInt;
 use netutils::Strings;
@@ -14,7 +17,6 @@ use std::thread;
 use std::fmt::Write as AWrite;
 use self::crypto::digest::Digest;
 use self::crypto::sha1::Sha1;
-use num_bigint::BigInt;
 
 fn main() -> std::io::Result<()> {
     let mut reader = TcpStream::connect("127.0.0.1:25565")?;
@@ -61,6 +63,7 @@ fn main() -> std::io::Result<()> {
 
 
                     println!("Sending encryption response")
+
                     // TOOD: encryption response
                 }
                 0x02 => {
