@@ -2,20 +2,16 @@ use serde_json::Value;
 use std::error::Error;
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
-use self::reqwest::StatusCode;
+use reqwest::{StatusCode, Client};
 use std::fmt::Write;
 
-extern crate reqwest;
-
-pub struct TokenContainer {
+pub struct AccountInfo {
     access_token: String,
     client_token: String,
     uuid: String,
 }
 
-pub fn auth(user: &str, password: &str) -> Result<TokenContainer, reqwest::Error> {
-    let client = reqwest::Client::new();
-
+pub fn auth(client: &Client, user: &str, password: &str) -> Result<AccountInfo, reqwest::Error> {
     let body: Value = json!({
         "agent": {
             "name": "Minecraft",
@@ -40,12 +36,11 @@ pub fn auth(user: &str, password: &str) -> Result<TokenContainer, reqwest::Error
     let client_token = body.get("clientToken").unwrap().as_str().unwrap().to_owned();
     let uuid = body.get("selectedProfile").unwrap().get("id").unwrap().as_str().unwrap().to_owned();
 
-    Ok(TokenContainer { access_token, client_token, uuid })
+    Ok(AccountInfo { access_token, client_token, uuid })
 }
 
-pub fn join_server(info: TokenContainer, server_id: String, secret: &Vec<u8>, key: &Vec<u8>) -> Result<(), String> {
+pub fn join_server(client: &Client, info: AccountInfo, server_id: String, secret: &Vec<u8>, key: &Vec<u8>) -> Result<(), String> {
     let sha = create_mc_sha1(&[&"".to_ascii_lowercase().as_bytes(), &secret, &key]);
-    let client = reqwest::Client::new();
 
     let body: Value = json!({
         "accessToken": info.access_token,

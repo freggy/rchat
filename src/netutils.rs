@@ -11,7 +11,6 @@ pub trait Strings {
 impl Strings for ByteBuffer {
     fn read_string_utf8(&mut self) -> Result<String, FromUtf8Error> {
         let len = self.read_var_int();
-        println!("str_len: {}", len);
         String::from_utf8(self.read_bytes(len as usize))
     }
 
