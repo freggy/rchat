@@ -33,8 +33,9 @@ use reqwest::Client;
 
 use openssl::symm;
 use openssl::symm::Mode::Decrypt;
+use serde_json::to_string_pretty;
 
-
+/*
 fn dec(c: &mut Crypter, data: Vec<u8>) {
     let mut out = vec![0u8; data.len()];
 
@@ -46,7 +47,7 @@ fn dec(c: &mut Crypter, data: Vec<u8>) {
     let id = bnuf.read_var_int();
 
     println!("{}", id);
-}
+}*/
 
 fn main() -> std::io::Result<()> {
     // 22
@@ -64,56 +65,33 @@ fn main() -> std::io::Result<()> {
     dec(&mut c, hex::decode("c5d0e9f5d59e7f5bff76bbafa7e3d1b46c3982").unwrap());
 
 */
-    let mut reader = TcpStream::connect("127.0.0.1:25565")?;
-    let mut writer = reader.try_clone().expect("Could not clone");
+    let mut stream = TcpStream::connect("127.0.0.1:25565")?;
     let mut buf = ByteBuffer::new();
 
 
     create_handshake_data(&mut buf, 47, "127.0.0.1", 25565, 2);
-    send_packet(&mut writer, &mut buf, false, 0x00);
+    send_packet(&mut stream, &mut buf, false, 0x00);
 
     create_login_start_data(&mut buf, "freggyy");
-    send_packet(&mut writer, &mut buf, false, 0x00);
-
+    send_packet(&mut stream, &mut buf, false, 0x00);
 
     {
-        let mut arr = vec![0u8; 16]; // allocate 5 bytes since varint are at max 5 bytes long
-        let mut encrypted = false;
         let mut secret = vec![0u8; 16];
         let mut state = "LOGIN";
         let mut cipher: Option<Crypter> = Option::None;
+        let mut arr = vec![0u8; 10];
 
         loop {
-            reader.read(&mut arr);
-
-
-            if encrypted == true {
-                match cipher.as_mut() {
-                    Some(c) => {
-                        let mut out = vec![0u8; arr.len()];
-                        c.update(&arr, &mut out);
-                        let mut buf2 = ByteBuffer::from_bytes(&out);
-                        buf2.read_var_int();
-                        let id2 = buf2.read_var_int();
-                        //println!("id: {}", id2);
-                    },
-                    None => println!("NONE")
-                }
-            }
+            read_stuff(&mut stream, &mut arr, &mut cipher);
 
             let mut buf = ByteBuffer::from_bytes(&arr);
             let len = buf.read_var_int();
             let id = buf.read_var_int();
 
-            // println!("id: {}", id);
-
-
             match id {
                 0x01 => {
-
                     if state == "LOGIN" {
-
-                        alloc(&mut reader, &mut arr, &mut buf, &mut None, len as usize, false);
+                        alloc(&mut stream, &mut arr, &mut buf, &mut cipher, len as usize);
 
                         println!("Received encryption request");
                         let server_id = buf.read_string_utf8().unwrap();
@@ -127,7 +105,7 @@ fn main() -> std::io::Result<()> {
 
                         let client = Client::new();
 
-                        match mojang::auth(&client, "qqontrol@web.de", "YEjuloUeiuc4H2p5Styv3jASmbyPZu") {
+                        match mojang::auth(&client, "<>", "<>") {
                             Ok(t) => {
                                 let mut rng = thread_rng();
                                 rng.fill(secret.as_mut_slice());
@@ -140,9 +118,7 @@ fn main() -> std::io::Result<()> {
                                 buf.clear(); // re-use
 
                                 create_encryption_response_data(&mut buf, key, &secret, token);
-                                encrypted = true;
-                                state = "PLAY";
-                                send_packet(&mut reader, &mut buf, false, 0x01);
+                                send_packet(&mut stream, &mut buf, false, 0x01);
                             }
                             Err(e) => {
                                 println!("Error while authentication: {:?}", e);
@@ -152,12 +128,17 @@ fn main() -> std::io::Result<()> {
                         println!("Sending encryption response");
                     }
                 }
+                0x03 => {
+                    if state == "LOGIN" {
+                        println!("SET COMPRESSION");
+                        return Ok(());
+                    }
+                }
                 0x02 => {
                     if state == "LOGIN" {
                         println!("Login successful!");
                         state = "PLAY";
-                    }
-                    else {
+                    } else {
                         println!("lul")
                         /*
                         alloc(&mut reader, &mut arr, &mut buf, &secret, len as usize, true);
@@ -170,29 +151,37 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-
     Ok(())
 }
 
-fn alloc(reader: &mut TcpStream, data: &mut Vec<u8>, buf: &mut ByteBuffer, cipher: &mut Option<Crypter>, len: usize, decrypt: bool) {
+fn read_stuff(tcp: &mut TcpStream, buf: &mut [u8], cipher: &mut Option<Crypter>) -> usize {
+    match cipher.as_mut() {
+        Some(c) => {
+            let ret = tcp.read(buf).unwrap();
+            let mut out = vec![0u8; ret];
+            c.update(&buf[..ret], &mut out);
+
+            for i in 0..ret {
+                buf[i] = out[i];
+            }
+            ret
+        }
+        None => {
+            tcp.read(buf).expect("lmao")
+        }
+    }
+}
+
+
+
+fn alloc(reader: &mut TcpStream, data: &mut Vec<u8>, buf: &mut ByteBuffer, cipher: &mut Option<Crypter>, len: usize) {
     if len > data.len() {
         data.resize(len, 0);
         buf.resize(len);
     }
-
-    if decrypt {
-        match cipher.as_mut() {
-            Some(c) => {
-                cryptoutils::decrypt(c, data);
-            },
-            None => println!("NONE")
-        }
-    }
-
-    reader.read(data);
+    read_stuff(reader, data, cipher);
     buf.write_bytes(data);
 }
-
 
 
 fn send_packet(tcp: &mut TcpStream, data: &mut ByteBuffer, encrypted: bool, id: i32) {
@@ -215,9 +204,8 @@ fn create_login_start_data(buf: &mut ByteBuffer, name: &str) {
     buf.clear();
     buf.write_string_utf8(name)
 }
-fn lol() {
 
-}
+fn lol() {}
 
 fn create_encryption_response_data(buf: &mut ByteBuffer, key: Vec<u8>, secret: &Vec<u8>, token: Vec<u8>) {
     buf.clear();
